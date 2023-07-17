@@ -25,6 +25,8 @@ impl Memory {
     pub const RX_PW_P4: u8 = 0x15;
     pub const RX_PW_P5: u8 = 0x16;
     pub const FIFO_STATUS: u8 = 0x17;
+    pub const DYN_PD: u8 = 0x1C;
+    pub const FEATURE: u8 = 0x1D;
 }
 
 pub struct BitMnemonic {}
@@ -68,6 +70,9 @@ impl BitMnemonic {
     pub const TX_EMPTY: u8 = 4;
     pub const RX_FULL: u8 = 1;
     pub const RX_EMPTY: u8 = 0;
+    pub const DPL_P0: u8 = 0;
+    pub const DPL_P1: u8 = 1;
+    pub const EN_DPL: u8 = 2;
 }
 
 pub struct Instruction {}
@@ -81,8 +86,9 @@ impl Instruction {
     pub const FLUSH_TX: u8 = 0xE1;
     pub const FLUSH_RX: u8 = 0xE2;
     pub const REUSE_TX_PL: u8 = 0xE3;
+    pub const R_RX_PL_WID: u8 = 0x60;
     pub const NOP: u8 = 0xFF;
 }
 
-pub const MIRF_CONFIG: u8 = ((1 << 3) | (0 << 2));
+pub const MIRF_CONFIG: u8 = ((1 << 3) | (1 << 2));
 pub const MIRF_ADDR_LEN: u8 = 5;

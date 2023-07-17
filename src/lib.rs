@@ -55,7 +55,13 @@ where
     CSN: OutputPin,
     CE: OutputPin,
 {
-    pub fn new(spi: SPI, csn: CSN, ce: CE, channel: u8, payload_size: u8) -> Result<Self, Error<E>> {
+    pub fn new(
+        spi: SPI,
+        csn: CSN,
+        ce: CE,
+        channel: u8,
+        payload_size: u8,
+    ) -> Result<Self, Error<E>> {
         let mut nrf24l01 = NRF24L01 {
             spi,
             csn,
@@ -79,10 +85,21 @@ where
         // self.config_register(Memory::SETUP_RETR, &0b11111)?;
 
         let channel = self.channel;
-        let payload_size = self.payload_size;
         self.config_register(Memory::RF_CH, &channel)?;
-        self.config_register(Memory::RX_PW_P0, &payload_size)?;
-        self.config_register(Memory::RX_PW_P1, &payload_size)?;
+
+        if (self.using_dynamic_payload()) {
+            // Dynamic payload
+            self.config_register(Memory::FEATURE, &(1 << BitMnemonic::EN_DPL));
+            self.config_register(
+                Memory::DYN_PD,
+                &((1 << BitMnemonic::DPL_P0) | (1 << BitMnemonic::DPL_P1)),
+            );
+        } else {
+            // Static payload
+            let payload_size = self.payload_size;
+            self.config_register(Memory::RX_PW_P0, &payload_size)?;
+            self.config_register(Memory::RX_PW_P1, &payload_size)?;
+        }
 
         self.power_up_rx()?;
         self.flush_rx()?;
@@ -233,12 +250,26 @@ where
         Ok(false)
     }
 
-    pub fn get_data(&mut self, buf: &mut [u8]) -> Result<(), Error<E>> {
+    pub fn get_data(&mut self, buf: &mut [u8]) -> Result<u8, Error<E>> {
+        let mut payload_length = self.payload_size;
+        if (self.using_dynamic_payload()) {
+            self.csn.set_low().map_err(|_| Error::Gpio)?;
+            self.spi.write(&[Instruction::R_RX_PL_WID])?;
+            let mut buffer = [0];
+            self.spi.transfer(&mut buffer)?;
+            self.csn.set_high().map_err(|_| Error::Gpio)?;
+            payload_length = buffer[0];
+        }
+
         self.csn.set_low().map_err(|_| Error::Gpio)?;
         self.spi.write(&[Instruction::R_RX_PAYLOAD])?;
-        self.spi.transfer(buf)?;
+        self.spi.transfer(&mut buf[0..(payload_length as usize)])?;
         self.csn.set_high().map_err(|_| Error::Gpio)?;
         self.config_register(Memory::STATUS, &(1 << BitMnemonic::RX_DR))?;
-        Ok(())
+        Ok(payload_length)
+    }
+
+    fn using_dynamic_payload(&self) -> bool {
+        self.payload_size == 0
     }
 }
